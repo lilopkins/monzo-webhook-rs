@@ -19,6 +19,7 @@ This has been tested against the following types of transactions:
 
 - Faster Payments in- and outbound
 - Pot and Account Deposits and Withdrawals
+- Contactless purchases
 
 ### This needs confirmation that it works with:
 
@@ -30,7 +31,6 @@ This has been tested against the following types of transactions:
 - Online refunds
 - Chip & PIN purchases
 - Chip & PIN refunds
-- Contactless purchases
 - Contactless refunds
 - Direct Debits
 - Standing Orders
