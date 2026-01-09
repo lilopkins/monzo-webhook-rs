@@ -188,6 +188,7 @@ struct_with_extra! { WebhookData,
     // TODO The following fields are known about, but we don't know what types they hold
     attachments: (),
     atm_fees_detailed: (),
+    #[allow(clippy::zero_sized_map_values, reason = "this needs refactor when we establish type anyway")]
     fees: HashMap<(), ()>,
     international: (),
     labels: (),

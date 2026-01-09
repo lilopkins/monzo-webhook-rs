@@ -3,6 +3,7 @@ use std::collections::HashMap;
 enum_with_extra! {
     untagged CounterpartyOrNone,
     Counterparty(Counterparty),
+    #[allow(clippy::zero_sized_map_values, reason = "this needs refactor when we establish type anyway")]
     None(HashMap<(), ()>),
 }
 
