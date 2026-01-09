@@ -1,0 +1,33 @@
+struct_with_extra! { Merchant,
+    id: String,
+    group_id: String,
+    name: String,
+    logo: String,
+    emoji: String,
+    category: String,
+    online: bool,
+    atm: bool,
+    address: MerchantAddress,
+    disable_feedback: bool,
+    suggested_tags: Option<String>,
+    metadata: MerchantMetadata,
+}
+
+struct_with_extra! { MerchantAddress,
+    short_formatted: String,
+    city: String,
+    latitude: f64,
+    longitude: f64,
+    zoom_level: u64,
+    approximate: bool,
+    formatted: String,
+    address: String,
+    region: String,
+    country: String,
+    postcode: String,
+}
+
+struct_with_extra! { MerchantMetadata,
+    suggested_tags: Option<String>,
+    website: Option<String>,
+}

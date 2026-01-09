@@ -2,6 +2,9 @@
 
 Serde-compatible structs containing the data from a Monzo bank webhook.
 
+For examples of what different webhooks look like, see
+[`src/tests.txt`](src/tests.txt).
+
 ## Usage
 
 When implemented a receiver for a Monzo bank webhook, you can use these
@@ -18,8 +21,10 @@ async fn test_webhook_parse(Json(data): Json<monzo_webhook::Webhook>) -> String 
 This has been tested against the following types of transactions:
 
 - Faster Payments in- and outbound
+- Monzo-to-Monzo transactions
 - Pot and Account Deposits and Withdrawals
 - Contactless purchases
+- Online purchases
 
 ### This needs confirmation that it works with:
 
@@ -27,7 +32,6 @@ This has been tested against the following types of transactions:
 - ATM deposits
 - Deposits
 - Cheques
-- Online purchases
 - Online refunds
 - Chip & PIN purchases
 - Chip & PIN refunds
@@ -38,7 +42,6 @@ This has been tested against the following types of transactions:
 - BACS Debits
 - CHAPS Transfers
 - International Transfers via Swift
-- Cash deposits
 - Fees and Charges
 - Interest Paid
 - Interest Earned
