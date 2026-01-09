@@ -6,241 +6,205 @@
     reason = "structs cannot be changed due to serialization"
 )]
 
-use chrono::{DateTime, Utc};
-use serde::Deserialize;
-
 use std::collections::HashMap;
 
-#[cfg(test)]
-mod tests;
+use chrono::{DateTime, Utc};
+
+pub use crate::string_boolean::StringBoolean;
 
 #[cfg(feature = "decode_everything")]
 pub type ExtraValues = HashMap<String, serde_json::Value>;
 
-/// The main webhook data type.
-#[derive(Clone, Debug, Deserialize)]
-pub struct Webhook {
+#[cfg(feature = "decode_everything")]
+pub mod has_extra_data;
+#[cfg(feature = "decode_everything")]
+pub use has_extra_data::*;
+
+/// Define an enum with an automatic `SomethingElse` variant that
+/// consumes any fields when no other variants match, but only when the
+/// `decode_everything` feature is enabled.
+macro_rules! enum_with_extra {
+    (
+        $(#[$attrs: meta])*
+        untagged $name: ident, $($(#[$variant_attrs: meta])* $variant: ident($variant_inner_ty: ty),)*
+    ) => {
+        $(#[$attrs])*
+        #[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+        #[serde(untagged)]
+        pub enum $name {
+            $($(#[$variant_attrs])* $variant($variant_inner_ty),)*
+
+            /// The value didn't match anything currently parsed.
+            #[cfg(feature = "decode_everything")]
+            SomethingElse(crate::ExtraValues),
+        }
+
+        #[cfg(feature = "decode_everything")]
+        impl crate::HasExtraData for $name {
+            fn has_extra_data(&self) -> bool {
+                match self {
+                    Self::SomethingElse(_vals) => true,
+                    $(Self::$variant(inner) => inner.has_extra_data(),)*
+                }
+            }
+        }
+    };
+    (
+        $case: expr => $(#[$attrs: meta])* $name: ident,
+        $($(#[$variant_attrs: meta])* $variant: ident,)*
+    ) => {
+        $(#[$attrs])*
+        #[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+        #[serde(rename_all = $case)]
+        pub enum $name {
+            $($(#[$variant_attrs])* $variant,)*
+
+            /// The value didn't match anything currently parsed.
+            #[cfg(feature = "decode_everything")]
+            #[serde(untagged)]
+            SomethingElse(String),
+        }
+
+        #[cfg(feature = "decode_everything")]
+        impl crate::HasExtraData for $name {
+            fn has_extra_data(&self) -> bool {
+                match self {
+                    Self::SomethingElse(_value) => true,
+                    _ => false,
+                }
+            }
+        }
+    };
+}
+
+/// Define a struct with an automatic `extra` field that consumes any
+/// remaining fields, but only when the `decode_everything` feature is
+/// enabled.
+macro_rules! struct_with_extra {
+    (
+        no_extra $(#[$attrs: meta])*
+        $name: ident, $($(#[$field_attrs: meta])* $field_name: ident: $field_typ: ty,)*
+    ) => {
+        $(#[$attrs])*
+        #[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+        pub struct $name {
+            $($(#[$field_attrs])* pub $field_name: $field_typ,)*
+        }
+
+        #[cfg(feature = "decode_everything")]
+        impl crate::HasExtraData for $name {
+            fn has_extra_data(&self) -> bool {
+                false $(|| self.$field_name.has_extra_data())*
+            }
+        }
+    };
+    (
+        $(#[$attrs: meta])*
+        $name: ident, $($(#[$field_attrs: meta])* $field_name: ident: $field_typ: ty,)*
+    ) => {
+        $(#[$attrs])*
+        #[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+        pub struct $name {
+            $($(#[$field_attrs])* pub $field_name: $field_typ,)*
+
+            /// The value had extra fields that weren't parsed into
+            /// another field.
+            #[cfg(feature = "decode_everything")]
+            #[cfg_attr(feature = "decode_everything", serde(flatten))]
+            pub extra: crate::ExtraValues,
+        }
+
+        #[cfg(feature = "decode_everything")]
+        impl crate::HasExtraData for $name {
+            fn has_extra_data(&self) -> bool {
+                let this_has_extra = !self.extra.is_empty();
+                this_has_extra
+                    $(|| self.$field_name.has_extra_data())*
+            }
+        }
+    };
+}
+
+#[cfg(test)]
+mod tests;
+
+pub mod counterparty;
+pub mod merchant;
+pub mod metadata;
+pub mod string_boolean;
+
+struct_with_extra! {
+    /// The main webhook data type.
+    Webhook,
     /// The type of webhook update.
-    /// Always one of:
-    /// - `transaction.created`
-    /// - `transaction.updated`
-    pub r#type: String,
-    pub data: WebhookData,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
+    r#type: WebhookType,
+    /// The webhook data
+    data: WebhookData,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct WebhookData {
-    pub id: String,
-    pub created: DateTime<Utc>,
-    pub description: String,
+enum_with_extra! {
+    "snake_case" => WebhookType,
+    #[serde(rename = "transaction.created")]
+    TransactionCreated,
+    #[serde(rename = "transaction.updated")]
+    TransactionUpdated,
+}
+
+struct_with_extra! { WebhookData,
+    id: String,
+    created: DateTime<Utc>,
+    description: String,
     /// The amount of money in the transaction, in whole pence (or equivalent for foreign currency)
-    pub amount: i64,
+    amount: i64,
     /// The ISO 4127 currency code of [`Self::amount`]
-    pub currency: String,
-    pub is_load: bool,
-    pub settled: SettledTimestamp,
+    currency: String,
+    is_load: bool,
+    settled: SettledTimestamp,
     /// The amount of money in the transaction, in whole pence (or equivalent for foreign currency)
-    pub local_amount: i64,
+    local_amount: i64,
     /// The ISO 4127 currency code of [`Self::local_amount`]
-    pub local_currency: String,
-    pub merchant: Option<Merchant>,
-    pub merchant_feedback_uri: String,
-    pub notes: String,
-    pub metadata: WebhookMetadata,
-    pub category: String,
-    pub updated: DateTime<Utc>,
-    pub account_id: String,
-    pub user_id: String,
-    pub counterparty: CounterpartyOrNone,
-    pub scheme: String,
-    pub dedupe_id: String,
-    pub originator: bool,
-    pub include_in_spending: bool,
-    pub can_be_excluded_from_breakdown: bool,
-    pub can_be_made_subscription: bool,
-    pub can_split_the_bill: bool,
-    pub can_add_to_tab: bool,
-    pub can_match_transactions_in_categorization: bool,
-    pub amount_is_pending: bool,
-    pub parent_account_id: String,
-    pub categories: Option<HashMap<String, i64>>,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
+    local_currency: String,
+    merchant: Option<merchant::Merchant>,
+    merchant_feedback_uri: String,
+    notes: String,
+    metadata: metadata::WebhookMetadata,
+    category: String,
+    updated: DateTime<Utc>,
+    account_id: String,
+    user_id: String,
+    counterparty: counterparty::CounterpartyOrNone,
+    scheme: Scheme,
+    dedupe_id: String,
+    originator: bool,
+    include_in_spending: bool,
+    can_be_excluded_from_breakdown: bool,
+    can_be_made_subscription: bool,
+    can_split_the_bill: bool,
+    can_add_to_tab: bool,
+    can_match_transactions_in_categorization: bool,
+    amount_is_pending: bool,
+    parent_account_id: String,
+    categories: Option<HashMap<String, i64>>,
+    // TODO The following fields are known about, but we don't know what types they hold
+    attachments: (),
+    atm_fees_detailed: (),
+    #[allow(clippy::zero_sized_map_values, reason = "this needs refactor when we establish type anyway")]
+    fees: HashMap<(), ()>,
+    international: (),
+    labels: (),
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub enum SettledTimestamp {
+enum_with_extra! {
+    untagged SettledTimestamp,
     Settled(DateTime<Utc>),
     /// If not yet settled, a string it returned, however it always seems to be empty.
     NotYetSettled(String),
-    #[cfg(feature = "decode_everything")]
-    SomethingElse(std::collections::HashMap<String, serde_json::Value>),
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct Merchant {
-    pub id: String,
-    pub group_id: String,
-    pub name: String,
-    pub logo: String,
-    pub emoji: String,
-    pub category: String,
-    pub online: bool,
-    pub atm: bool,
-    pub address: MerchantAddress,
-    pub disable_feedback: bool,
-    pub suggested_tags: String,
-    pub metadata: MerchantMetadata,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct MerchantAddress {
-    pub short_formatted: String,
-    pub city: String,
-    pub latitude: f64,
-    pub longitude: f64,
-    pub zoom_level: u64,
-    pub approximate: bool,
-    pub formatted: String,
-    pub address: String,
-    pub region: String,
-    pub country: String,
-    pub postcode: String,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct MerchantMetadata {
-    pub suggested_tags: String,
-    pub website: String,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct WebhookMetadata {
-    #[serde(flatten)]
-    pub subtype: WebhookMetadataSubtype,
-    pub ledger_committed_timestamp_earliest: DateTime<Utc>,
-    pub ledger_committed_timestamp_latest: DateTime<Utc>,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub enum WebhookMetadataSubtype {
-    FasterPayment(FasterPayment),
-    MoneyTransfer(MoneyTransfer),
-    MerchantTransaction(MerchantTransaction),
-    #[cfg(feature = "decode_everything")]
-    SomethingElse(std::collections::HashMap<String, serde_json::Value>),
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub enum CounterpartyOrNone {
-    Counterparty(Counterparty),
-    None {},
-    #[cfg(feature = "decode_everything")]
-    SomethingElse(std::collections::HashMap<String, serde_json::Value>),
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct Counterparty {
-    pub account_number: String,
-    pub name: String,
-    pub sort_code: String,
-    pub user_id: String,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-/// A Faster Payments transaction
-#[derive(Clone, Debug, Deserialize)]
-pub struct FasterPayment {
-    pub faster_payment: String,
-    pub fps_fpid: String,
-    pub fps_payment_id: String,
-    pub insertion: String,
-    pub notes: String,
-    pub standin_correlation_id: String,
-    pub trn: String,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-/// A move of money between pots or accounts
-#[derive(Clone, Debug, Deserialize)]
-pub struct MoneyTransfer {
-    #[serde(flatten)]
-    pub subtype: MoneyTransferSubtype,
-    pub external_id: String,
-    pub ledger_insertion_id: String,
-    pub move_money_transfer_id: String,
-    pub pot_account_id: String,
-    pub pot_id: String,
-    pub transaction_description_localised: String,
-    pub transaction_locale_country: String,
-    pub trigger: String,
-    pub user_id: String,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub enum MoneyTransferSubtype {
-    PotWithdrawal(PotWithdrawal),
-    PotDeposit(PotDeposit),
-    #[cfg(feature = "decode_everything")]
-    SomethingElse(std::collections::HashMap<String, serde_json::Value>),
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct PotWithdrawal {
-    pub money_transfer_id: String,
-    pub pot_withdrawal_id: String,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct PotDeposit {
-    pub pot_deposit_id: String,
-    #[cfg(feature = "decode_everything")]
-    #[cfg_attr(feature = "decode_everything", serde(flatten))]
-    pub extra: ExtraValues,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct MerchantTransaction {
-    pub mcc: String,
-    pub token_transaction_identifier: String,
-    pub tokenization_method: String,
-    pub transaction_description_localised: String,
-    pub transaction_locale_country: String,
-    pub standin_correlation_id: String,
-    pub token_unique_reference: String,
-    pub ledger_insertion_id: String,
-    pub mastercard_lifecycle_id: String,
-    pub mastercard_approval_type: String,
-    pub mastercard_auth_message_id: String,
-    pub mastercard_card_id: String,
+enum_with_extra! { "snake_case" => Scheme,
+    Mastercard,
+    PayportFasterPayments,
+    UkRetailPot,
+    MonzoFlex,
+    MonzoToMonzo,
 }
