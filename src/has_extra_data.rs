@@ -26,6 +26,7 @@ has_no_extra_data!(bool);
 has_no_extra_data!(f64);
 has_no_extra_data!(u64);
 has_no_extra_data!(i64);
+has_no_extra_data!(chrono::NaiveDate);
 has_no_extra_data!(());
 
 impl<T: HasExtraData> HasExtraData for Option<T> {

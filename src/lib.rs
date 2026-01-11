@@ -129,6 +129,7 @@ macro_rules! struct_with_extra {
 mod tests;
 
 pub mod counterparty;
+pub mod decline;
 pub mod merchant;
 pub mod metadata;
 pub mod string_boolean;
@@ -185,6 +186,8 @@ struct_with_extra! { WebhookData,
     amount_is_pending: bool,
     parent_account_id: String,
     categories: Option<HashMap<String, i64>>,
+    #[serde(flatten)]
+    declined: Option<decline::Decline>,
     // TODO The following fields are known about, but we don't know what types they hold
     attachments: (),
     atm_fees_detailed: (),
