@@ -8,6 +8,7 @@ pub mod shared_metadata;
 
 // no_extra is safe here as spare data is picked up elsewhere
 struct_with_extra! { no_extra WebhookMetadata,
+    notes: Option<String>,
     #[serde(flatten)]
     subtype: WebhookMetadataSubtype,
 }

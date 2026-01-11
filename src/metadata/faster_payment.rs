@@ -7,7 +7,6 @@ struct_with_extra! {
     fps_fpid: String,
     fps_payment_id: String,
     insertion: String,
-    notes: String,
     standin_correlation_id: String,
     trn: String,
     #[serde(flatten)]

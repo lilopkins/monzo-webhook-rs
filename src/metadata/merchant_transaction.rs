@@ -15,7 +15,7 @@ struct_with_extra! { MerchantTransaction,
     transaction_locale_country: String,
     standin_correlation_id: String,
     mastercard_lifecycle_id: String,
-    mastercard_approval_type: MastercardApprovalType,
+    mastercard_approval_type: Option<MastercardApprovalType>,
     mastercard_auth_message_id: String,
     mastercard_card_id: String,
     /// Set once the transaction has been cleared, often the next
@@ -32,6 +32,9 @@ struct_with_extra! { MerchantTransaction,
     /// The ID of the transaction if you decide to round up into a
     /// savings account
     coin_jar_transaction: Option<String>,
+    hide_amount: Option<StringBoolean>,
+    hide_transaction: Option<StringBoolean>,
+    auth_account_id: Option<String>,
     #[serde(flatten)]
     ledger_details: super::ledger::LedgerDetails,
 }
