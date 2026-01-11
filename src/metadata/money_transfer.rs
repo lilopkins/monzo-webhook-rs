@@ -21,7 +21,6 @@ struct_with_extra! {
     /// Only present on a pot deposit
     pot_deposit_id: Option<String>,
     covering_date: Option<NaiveDate>,
-    notes: Option<String>,
     #[serde(flatten)]
     hold_decision: Option<super::shared_metadata::HoldDecision>,
     #[serde(flatten)]
