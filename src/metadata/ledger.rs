@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 
 struct_with_extra! { no_extra LedgerDetails,
-    ledger_committed_timestamp_earliest: DateTime<Utc>,
-    ledger_committed_timestamp_latest: DateTime<Utc>,
+    ledger_committed_timestamp_earliest: Option<DateTime<Utc>>,
+    ledger_committed_timestamp_latest: Option<DateTime<Utc>>,
     ledger_insertion_id: Option<String>,
     ledger_entry_intent: Option<LedgerEntryIntent>,
     ledger_intent: Option<LedgerIntent>,
